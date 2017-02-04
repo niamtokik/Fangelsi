@@ -1,0 +1,698 @@
+#!/usr/bin/env sh
+######################################################################
+# easy way to connect multiple jails.
+######################################################################
+DEBUG="YES"
+DRYRUN=""
+
+if ! [ -r "/usr/local/etc/fang.conf" ]
+then
+  JAILS_PATH="/jails"
+  CONFIG_PATH="${JAILS_PATH}/etc"
+  THIN_PATH="${JAILS_PATH}/thin"
+  TEMPLATES_PATH="${JAILS_PATH}/template"
+  DEFAULT_TEMPLATE="${TEMPLATES_PATH}/standard.tgz"
+else
+  . "/usr/local/etc/fang.conf"
+fi
+
+CMD_JAIL_OPTS=""
+CMD_JAIL="jail ${CMD_JAIL_OPTS}"
+
+######################################################################
+#
+######################################################################
+_print_debug() {
+    if [ "${DEBUG}" ]
+    then
+	printf -- "debug: %s" "${*}" 1>&2
+    fi
+}
+
+_printn_debug() {
+    if [ "${DEBUG}" ]
+    then
+	printf -- "%s\n" "${*}" 1>&2
+    fi
+}
+
+_print_info() {
+    printf -- "info: %s" "${*}"
+}
+
+_print_warning() {
+    printf -- "warning: %s" "${*}"
+}
+
+_print_error() {
+    printf -- "error: %s"  "${*}"
+}
+
+_printn() {
+    printf -- "%s\n" "${*}"
+}
+
+######################################################################
+#
+######################################################################
+_is_set() {
+    if ! [ "${1}" ]
+    then
+	printf -- "error: %s\n" "${2}"
+	exit 1
+    fi
+}
+
+_is_deployed() {
+    local conf name
+    name=${name}
+    conf="/${JAILS_PATH}/etc/${name}.cfg"
+    if [ -f "${conf}" ]
+    then
+	return 0
+    else
+	return 1
+    fi
+}
+
+_is_running() {
+    if jls -n | grep "name=${1}" 2>&1 >/dev/null
+    then
+	return 0
+    else
+	return 1
+    fi
+}
+
+_is_interface() {
+    local interface
+    interface=${1}
+    (ifconfig ${interface} 2>&1) >/dev/null
+}
+
+######################################################################
+#
+######################################################################
+_starts() {
+    _is_set "${1}" "require jail name"
+    for jail in ${1}
+    do
+	_start ${jail}
+    done
+}
+
+_start() {
+    _is_set "${1}" "require jail name"
+    local conf name
+    name="${1}" 
+    conf="${JAILS_PATH}/etc/${1}.cfg"
+    if _is_deployed ${name} && ! _is_running ${name}
+    then
+	jail -f "${conf}" -c "${name}"
+    fi
+}
+
+_console() {
+    local name
+    _is_set "${1}" "require jail name"
+    name="${1}" 
+    if _is_deployed ${name} && _is_running ${name}
+    then
+	jexec "${name}" ${SHELL}
+    fi
+}
+
+_list() {
+    for i in $(ls ${JAILS_PATH}/etc/*.cfg)
+    do
+	local name
+	name=${i%.cfg}
+	name=${name##*/}
+	if jls -n | grep "name=${name}" 2>&1 >/dev/null
+	then
+	    echo ${name}
+	fi
+    done
+}
+
+_stops() {
+    if [ "$1" ]
+    then
+	for jail in ${1}
+	do
+	    _stop ${jail}
+	done
+    else
+	for jail in $(_list)
+	do
+	    _stop ${jail}
+	done
+    fi
+}
+
+_stop() {
+    _is_set "${1}" "require jail name"
+    local name conf
+    name="${1}" 
+    conf="${JAILS_PATH}/etc/${1}.cfg"
+    if _is_deployed ${name} && _is_running ${name}
+    then
+	jail -f "${conf}" -r "${name}"
+    fi
+}
+
+_restart() {
+    _stops "${*}"
+    _starts "${*}"
+}
+
+_update_package() {
+    _is_set "${1}" "require jail name"
+    local name package
+    name="${1}"
+    if _is_running "${name}"
+    then
+	pkg -j "${name}" update
+    else
+	_start "${name}"
+	pkg -j "${name}" update
+	_stop "${name}"
+    fi
+}
+
+_install_package() {
+    _is_set "${1}" "require jail name"
+    _is_set "${2}" "require package name"
+    local name package
+    name="${1}"
+    package="${2}"
+    if _is_running "${name}"
+    then
+	pkg -j "${name}" install "${package}"
+    else
+	_start "${name}"
+	pkg -j "${name}" install "${package}"
+	_stop "${name}"
+    fi
+}
+
+_connect() {
+    local source 
+    #_new_struct | _set_struct_source "${1}" \
+    #            | _set_null_separator to "${2}" \
+    #            | _set_struct_destination "${3}" \
+    #            | _set_struct_links \
+    #            | _set_null_separator "with" "${4}" \
+    #            | _set_struct_method "${5}" 
+
+    st=$(_new_struct | _set_struct_method "${5}" \
+                     | _set_null_separator "with" "${4}" \
+                     | _set_struct_links \
+                     | _set_struct_destination "${3}" \
+                     | _set_null_separator to "${2}" \
+                     | _set_struct_source "${1}")
+
+    echo ${st}
+    _gen_actions ${st}
+}
+
+_gen_actions() {
+  local struct method
+  struct=${*}
+  method=$(echo ${struct} | _get_struct method)
+  case ${method}
+  in
+    epair) _epair ${struct};;
+    bridge) _bridge ${struct};;
+    *) exit 1
+  esac
+}
+
+_epair() {
+  local struct
+  struct=${*}
+
+  local epair
+  local source source_mac source_ip
+  local destination destination_mac destination_ip
+
+  epair=$(ifconfig epair create)
+
+  source=$(echo ${struct} | _get_struct source)
+  source_mac=$(echo ${struct} | _get_struct source_mac)
+  source_ip=$(echo ${struct} | _get_struct source_ip)
+
+  ifconfig ${epair%a}a link ${source_mac} up
+  ifconfig ${epair%a}a vnet ${source}
+
+  if [ "${source_ip}" ]
+  then
+    jexec ${source} ifconfig ${epair%a}a alias ${source_ip}
+  fi
+
+  destination=$(echo ${struct} | _get_struct destination)
+  destination_mac=$(echo ${struct} | _get_struct destination_mac)
+  destination_ip=$(echo ${struct} | _get_struct destination_ip)
+
+  ifconfig ${epair%a}b link ${destination_mac} up
+  ifconfig ${epair%a}b vnet ${destination}
+  if [ "${destination_ip}" ]
+  then
+    jexec ${destination} ifconfig ${epair%a}b alias ${destination_ip}
+  fi
+}
+
+_bridge() {
+  local struct 
+  local source source_ip source_epair
+  local destination destination_ip destination_epair
+  local bridge
+  struct=${*}
+
+  ifconfig bridge0 create
+  bridge=$(ifconfig bridge create)
+
+  source=$(echo ${struct} | _get_struct source)
+  source_ip=$(echo ${struct} | _get_struct source_ip)
+
+  source_epair=$(ifconfig epair create)
+  ifconfig ${source_epair%a}a link $(_generate_mac_address) up
+  ifconfig ${source_epair%a}b link $(_generate_mac_address) up
+  ifconfig ${bridge} addm ${source_epair%a}a
+  ifconfig ${source_epair%a}b vnet ${source}
+  if [ "${source_ip}" ]
+  then
+    jexec ${source} ifconfig ${source_epair%a}b alias ${source_ip}
+  fi
+
+  destination=$(echo ${struct} | _get_struct destination)
+  destination_mac=$(echo ${struct} | _get_struct destination_mac)
+  destination_ip=$(echo ${struct} | _get_struct destination_ip)
+
+  destination_epair=$(ifconfig epair create)
+  ifconfig ${destination_epair%a}a link $(_generate_mac_address) up
+  ifconfig ${destination_epair%a}b link $(_generate_mac_address) up
+  ifconfig ${bridge} addm ${destination_epair%a}a
+  ifconfig ${destination_epair%a}b vnet ${destination}
+  if [ "${destination_ip}" ]
+  then
+    echo jexec ${destination} ifconfig epair0b alias ${destination_ip}
+    jexec ${destination} ifconfig ${destination_epair%a}b \
+      alias ${destination_ip}
+  fi
+}
+
+_extract_args() {
+  local struct
+}
+
+_new_struct() {
+  return 0
+}
+
+_set_struct() {
+  local buf key value
+  key="${1}"
+  value="${2}"
+  while read line
+  do
+    if [ "${buf}" ]
+    then
+      buf="${buf} ${line}"
+    else
+      buf="${line}"
+    fi
+  done
+  echo "${key}=${value} ${buf}"
+}
+
+_set_null() {
+  while read line
+  do
+    echo ${line}
+  done
+}
+
+_set_struct_source() {
+  local source source_ip
+  _is_set "${1}" "require source (jail name or id)"
+  source=$(echo ${1} | awk -F: '{ print $1 }')
+  source_ip=$(echo ${1} | awk -F: '{ print $2 }')
+
+  if [ "${source_ip}" != "${source}" ]
+  then
+    _set_struct source "${source}" \
+      | _set_struct_source_ip ${source_ip}
+  else
+    _set_struct source ${source} 
+  fi
+}
+
+_set_struct_destination() {
+  local destination destination_ip
+  _is_set "${1}" "require destination (jail name or id)"
+  destination=$(echo ${1} | awk -F: '{ print $1 }')
+  destination_ip=$(echo ${1} | awk -F: '{ print $2 }')
+
+  if [ "${destination_ip}" != "${source}" ]
+  then
+    _set_struct destination "${destination}" \
+      | _set_struct_destination_ip ${destination_ip}
+  else
+    _set_struct destination "${destination}" 
+  fi
+}
+
+_set_struct_method() {
+  _is_set "${1}" "require method"
+  case "${1}"
+  in
+    direct|epair|ep) _set_struct method epair;;
+    bridge|br) _set_struct method bridge;;
+    vlan|vl)   _set_struct method vlan;;
+    vxlan|vx)  _set_struct method vxlan;; 
+    *) _print_error "unsupported method ${1}"; echo; exit 1;;
+  esac
+}
+
+_set_struct_interface() {
+  _is_set "${1}" "require interface name"
+  _set_struct interface "${1}"
+}
+
+_set_struct_links() {
+  _set_struct_mac_source ${1} \
+    | _set_struct_mac_destination ${2}
+}
+
+_set_struct_mac_source() {
+  local mac
+  mac=$(_generate_mac_address)
+  _set_struct source_mac ${mac}
+}
+
+_set_struct_mac_destination() {
+  local mac
+  mac=$(_generate_mac_address)
+  _set_struct destination_mac ${mac}
+}
+
+_set_struct_source_ip() {
+  _set_struct source_ip "${1}"
+}
+
+_set_struct_destination_ip() {
+  _set_struct destination_ip "${1}"
+}
+
+_set_null_separator() {
+  local separator got
+  separator="${1}" 
+  got="${2}"
+  if ! [ "${separator}" = "${got}" ]
+  then
+    _print_error "required '${separator}', got '${got}'" 
+    exit 1
+  fi
+  _set_null
+}
+
+_get_struct() {
+  local buf key kv
+  key="${1}"; shift
+  buf=$(while read line; do echo $line; done)
+  for kv in ${buf}
+  do
+    local k v
+    k=$(echo ${kv} | cut -d= -f1)
+    v=$(echo ${kv} | cut -d= -f2)
+    if [ "${k}" = "${key}" ]
+    then
+      echo "${v}"
+      return 0
+    fi
+  done
+  return 1
+}
+
+_generate_mac_address() {
+   mac=$(openssl rand 6 -hex | sed -re 's/../&:/g;s/:$//;s/^../02/')
+   echo ${mac}
+}
+
+_connect_unsupported() {
+    print_error "unsupported method" $'\n'
+    exit 1
+}
+
+_connect_interface() {
+    local jail interface
+    _is_set "${1}" "require jail"
+    jail="${1}"    
+    _is_set "${2}" "require interface"
+    interface="${2}"
+    
+    ifconfig ${interface} vnet ${jail}
+}
+
+_connect_direct() {
+    _is_set "${1}" "require source"
+    _is_set "${2}" "require destination"
+    
+    _print_debug "create epair... "
+    epair=$(_create_epair)
+    _printn_debug "${epair}."
+    
+    _print_debug "add ${epair%a}a to ${source}..."
+    _interface_to_jail ${source} ${epair%a}a
+    _active_jail_interface ${source} ${epair%a}a
+    _printn_debug "ok."
+    
+    _print_debug "add ${epair%a}b to ${destination}..."
+    _interface_to_jail ${destination} ${epair%a}b
+    _active_jail_interface ${destination} ${epair%a}b
+    _printn_debug "ok."
+}
+
+
+_connect_bridge() {
+    local source destination
+    local sdescr ddescr
+    local source_epair destination_epair
+    local bridge description
+    _is_set "${1}" "require source"
+    source="${1}"
+    
+    _is_set "${2}" "require destination"
+    destination="${2}"
+
+    description="fangelsi: ${source} to ${destination}"
+    bridge=$(_bridge_create "${description}")
+    source_epair=$(_create_epair)
+    destination_epair=$(_create_epair)
+    
+    _print_debug "add ${source} interface ${source_epair%a}a in ${bridge}... "
+    _bridge_add ${bridge} ${source_epair%a}a 
+    _printn_debug "ok."
+    
+    _print_debug "add ${destination} interface ${destination_epair%a}a in ${bridge}... "
+    _bridge_add ${bridge} ${destination_epair%a}a
+    _printn_debug "ok."
+    
+    _interface_to_jail ${source} ${source_epair%a}b
+    _active_jail_interface ${source} ${source_epair%a}b
+    
+    _interface_to_jail ${destination} ${destination_epair%a}b
+    _active_jail_interface ${destination} ${destination_epair%a}b
+}
+
+_create_epair() {
+    local interface last wlast parse mac_a mac_b
+    interface=$(ifconfig epair create 2>/dev/null)
+
+    # generate first interface
+    mac_a=$(_generate_mac_address)
+
+    # get last 2bytes from mac_a
+    last=$(echo "${mac_a}" \
+              | cut -d":" -f6 \
+              | tr "[:lower:]" "[:upper:]")
+    wlast=$(echo "${mac_a}" \
+               | sed -Ee 's/:[a-fA-F0-9]+$//')
+
+    # increment 2bytes by 1 modulo 255
+    increment=$(echo "(${last}+1)%FF" | bc -e "ibase=16")
+
+    # parse increment value
+    parse=$(printf -- "%0.2x\n" "${increment}")
+
+    # finaly generate mac address
+    mac_b=$(echo "${wlast}":"${parse}")
+
+    ifconfig ${interface%a}a link ${mac_a} up 2>/dev/null
+    ifconfig ${interface%a}b link ${mac_b} up 2>/dev/null
+    echo ${interface}
+}
+
+_bridge_create() {
+    local description
+    ifconfig bridge create up description "${description}"
+}
+
+_bridge_add() {
+    local bridge interface
+    bridge=${1}
+    interface=${2}
+    ifconfig ${bridge} addm ${interface}
+}
+
+_interface_to_jail() {
+    local jail interface description
+    jail=${1}
+    interface=${2}
+    description="fangelsi ${jail}"
+    ifconfig ${interface} vnet ${jail}
+}
+
+_active_jail_interface() {
+    local jail interface
+    jail="${1}"
+    interface="${2}"
+    jexec "${jail}" ifconfig "${interface}" up
+}
+
+_clear() {
+    local interface match
+    for i in $(_clear_epair) $(_clear_bridge)
+    do
+	if _is_interface ${i}
+	then
+	    _destroy_interface ${i}
+	fi
+    done
+}
+
+
+_destroy_interface() {
+    local interface
+    interface=${1}
+    ifconfig ${interface} destroy
+}
+
+_clear_bridge() {
+    ifconfig -a \
+	| sed -Ee "/^bridge/{s/(^bridge[0-9]+):.*/\1/;p;}; d;"
+}
+
+_clear_epair() {
+    ifconfig -a \
+	| sed -Ee "/^epair/{s/(^epair[0-9]+(a|b)):.*/\1/;p;}; d;"
+}
+
+_printf() {
+    local str
+    str=${1}; shift
+    printf -- "${str}\n" ${*}
+}
+
+_deploy() {
+    local name
+    _is_set "${1}" "require jail name"
+    name=${1}
+    _deploy_template ${name}
+    _deploy_configuration ${name}
+}
+
+_deploy_template() {
+    local name
+    name=${1}
+    if ! [ -d "${THIN_PATH}/${name}" ]
+    then
+      mkdir ${THIN_PATH}/${name}
+      tar zxvpf ${DEFAULT_TEMPLATE} -C ${THIN_PATH}/${name}
+    fi
+}
+
+_deploy_configuration() {
+    local name conf header
+    name="${1}"
+    conf="${CONFIG_PATH}/${name}.cfg"
+    
+    if ! [ -f "${conf}" ]
+    then
+      _configuration_init "${conf}"
+      _configuration_header "${conf}"
+      _configuration_set "${conf}"
+      _configuration_tail "${conf}"
+    fi
+}
+
+_configuration_init() {
+    local conf
+    touch "${conf}"
+}
+
+_configuration_header() {
+    local conf
+    conf="${1}"
+    if [ -f "${CONFIG_PATH}/header" ]
+    then
+	cat "${CONFIG_PATH}/header" > "${conf}"
+    fi
+}
+
+_configuration_set() {
+    local conf
+    conf="${1}"
+}
+
+_configuration_tail() {
+    local conf
+    conf="${1}"
+    if [ -f "${CONFIG_PATH}/tail" ]
+    then
+	cat "${CONFIG_PATH}/tail" >> "${tail}"
+    fi    
+}
+
+_destroy() {
+  local name
+  _is_set "${1}" "require jail name"
+  name=${1}
+  if [ -d "${THIN_PATH}/${name}" ]
+  then
+    echo chflags -R 0 "${THIN_PATH}/${name}"
+    echo rm -Rf "${THIN_PATH}/${name}"
+    echo rm "${CONFIG_PATH}/${name}.cfg"
+  fi
+}
+
+_usage() {
+    _printf "Usage: %s start Jail ..." "${0}"
+    _printf "       %s stop [Jail ...]" "${0}"
+    _printf "       %s restart Jail ..." "${0}"
+    _printf "       %s list" "${0}"
+    _printf "       %s console Jail" "${0}"
+    _printf "       %s install Jail Package" "${0}"
+    _printf "       %s update Jail Package" "${0}"
+    _printf "       %s connect JailN to JailM with Method" "${0}"
+    _printf "       %s clear" "${0}"
+    _printf "       %s deploy Jail" "${0}"
+}
+
+arg="${1}"; shift
+case "${arg}"
+in
+    start) _starts "${*}";;
+    restart) _restart "${*}";;
+    list) _list;;
+    stop) _stops "${*}";;
+    console|cons) _console "${1}";;
+    install) _install_package "${1}" "${2}";;
+    update) _update_package "${1}";;
+    connect) _connect ${*};;
+    clear) _clear;;
+    deploy) _deploy ${1};;
+    destroy) _destroy ${1};;
+    *) _usage;;
+esac
