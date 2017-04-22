@@ -39,9 +39,12 @@
  */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <sys/param.h>
+#include "iovec.h"
 #include <jail.h>
 #include <sys/jail.h>
-#include "iovec.h"
 #include "jail.h"
 
 /** \brief return jid of first started jail from kernel
@@ -55,9 +58,10 @@
  */
 int
 get_first_jail(void) {
-  struct iovec io[4] = _lastjid();
-  jail_get(_lastjid(), 2, 0);
-  return io[3].iov_base;
+  //struct iovec io[4] = _lastjid();
+  //jail_get(_lastjid(), 2, 0);
+  //return io[3].iov_base;
+  return -1;
 }
 
 
@@ -74,7 +78,10 @@ get_first_jail(void) {
  * @todo
  */
 int
-get_next_jail(int jid) {}
+get_next_jail(int jid) {
+  printf("%d\n", jid);
+  return -1;
+}
 
 
 /** \brief give a name and search associated jid 
@@ -86,7 +93,10 @@ get_next_jail(int jid) {}
  * @todo
  */
 int
-get_jid(char *name){}
+get_jid(char *name){
+  printf("%s\n", name);
+  return -1;
+}
 
 
 /** \brief give a jid and search for associated name if
@@ -98,7 +108,10 @@ get_jid(char *name){}
  * @todo
  */
 char *
-get_name(int jid){}
+get_name(int jid){
+  printf("%d\n", jid);
+  return "";
+}
 
 
 /** \brief return a list of all running jail as jid
@@ -109,7 +122,11 @@ get_name(int jid){}
  * @todo
  */
 int
-get_all_jid(int *list, size_t len){}
+get_all_jid(int *list, size_t len){
+  printf("%p\n", &list);
+  printf("%zu\n", len);
+  return -1;
+}
 
 
 /** \brief
@@ -120,7 +137,12 @@ get_all_jid(int *list, size_t len){}
  * @todo
  */
 struct iovec *
-get_parameter_with_jid(int jid, iovec *param){}
+get_parameter_with_jid(int jid, struct iovec *param){
+  static struct iovec *t;
+  printf("%d\n", jid);
+  printf("%p\n", &param);
+  return t;
+}
 
 
 /** \brief
@@ -131,7 +153,12 @@ get_parameter_with_jid(int jid, iovec *param){}
  * @todo
  */
 struct iovec *
-get_parameter_with_name(char *name, iovec *param){}
+get_parameter_with_name(char *name, struct iovec *param){
+  static struct iovec *t;
+  printf("%s\n", name);
+  printf("%p\n", &param);
+  return t;
+}
 
 
 /** \brief
@@ -142,7 +169,11 @@ get_parameter_with_name(char *name, iovec *param){}
  * @todo
  */
 struct iovec *
-get_parameters_with_jid(int jid){}
+get_parameters_with_jid(int jid){
+  static struct iovec *t;
+  printf("%d\n", jid);
+  return t;
+}
 
 
 /** \brief
@@ -153,7 +184,11 @@ get_parameters_with_jid(int jid){}
  * @todo
  */
 struct iovec *
-get_parameters_with_name(char *name){}
+get_parameters_with_name(char *name){
+  static struct iovec *t;
+  printf("%s\n", name);
+  return t;
+}
 
 
 /** \brief return a pointer to iovec set with name
@@ -173,7 +208,7 @@ _lastjid(void){
   static struct tuple *tu;
   tu = iovec_tuple("lastjid", sizeof("lastjid"),
 		   &jid, sizeof(jid));
-  return tu;
+  return tuple_to_iovec(tu);
 }
 
 
@@ -185,7 +220,11 @@ _lastjid(void){
  * @todo
  */
 struct iovec *
-_name(char *name){}
+_name(char *name){
+  static struct iovec *t;
+  printf("%s\n", name);
+  return t;
+}
 
 
 /** \brief return a pointer to iovec set with jid
@@ -196,7 +235,11 @@ _name(char *name){}
  * @todo
  */
 struct iovec *
-_jid(int jid){}
+_jid(int jid){
+  static struct iovec *t;
+  printf("%d\n", jid);
+  return t;
+}
 
 
 /** \brief return a pointer to iovec with parameter
@@ -207,4 +250,9 @@ _jid(int jid){}
  * @todo
  */
 struct iovec *
-_parameter(char *param, size_t param_len){}
+_parameter(char *param, size_t param_len){
+  static struct iovec *t;
+  printf("%s\n", param);
+  printf("%zu\n", param_len);
+  return t;
+}
