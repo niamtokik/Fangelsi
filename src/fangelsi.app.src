@@ -1,0 +1,16 @@
+{application, fangelsi,
+ [{description, "Erlang FreeBSD Jail Manager"},
+  {vsn, "0.1.0"},
+  {registered, []},
+  {mod, { fangelsi_app, []}},
+  {applications,
+   [kernel,
+    stdlib
+   ]},
+  {env,[]},
+  {modules, []},
+
+  {maintainers, ["Mathieu Kerjouan"]},
+  {licenses, ["3-BSD Clause"]},
+  {links, ["https://github.com/niamtokik/fangelsi"]}
+ ]}.
