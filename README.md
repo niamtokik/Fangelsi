@@ -1,6 +1,13 @@
 # Fangelsi
 
-Erlang FreeBSD/DragonFlyBSD jail manager.
+Erlang FreeBSD/DragonFlyBSD jail manager. 
+
+## Compatibility
+
+ * Need to work with FreeBSD9+
+ * Need to work with DragonFlyBSD4+
+ * Need to work with HardenedBSD10+
+ * Need to work with ERL16+
 
 ## C Library
 
