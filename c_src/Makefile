@@ -9,16 +9,28 @@ CC ?= cc
 CC_INCLUDES += -I/usr/local/include
 CC_INCLUDES += -I$(ERLANG_PATH)/usr/include
 CC_LIBRARIES = -ljail
-CC_WARNINGS = -Wall -Wextra -Werror
+CC_WARNINGS = -Wall -Wextra -Werror 
+CC_WARNINGS += -Wformat -Wformat-security -Werror=format-security
 CC_ERLANG = -fpic -shared
 CC_OPTS = $(CC_WARNINGS) $(CC_ERLANG) $(CC_LIBRARIES) $(CC_INCLUDES)
+
 
 .ifdef DESTDIR
 	mkdir $(DESTDIR)
 .endif
 
+.ifdef PROD
+	# security features from
+	# http://blog.quarkslab.com/clang-hardening-cheat-sheet.html
+	CC_OPTS += -Wl --strip-debug  --strip-all -z,relro
+	CC_OPTS += -D_FORTIFY_SOURCE=2
+	CC_OPTS += -fPIC
+	CC_OPTS += -fstack-protector -fsanitize=safe-stack
+	CC_OPTS += -fsanitize=cfi
+.endif
+
 .ifdef DEBUG
-	CC_OPTS += -g
+	CC_OPTS += -g -fdebug-macro
 .endif
 
 ######################################################################
