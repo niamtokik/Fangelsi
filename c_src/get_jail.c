@@ -58,10 +58,12 @@
  */
 int
 get_first_jail(void) {
-  //struct iovec io[4] = _lastjid();
-  //jail_get(_lastjid(), 2, 0);
-  //return io[3].iov_base;
-  return -1;
+  static int jid = 0;
+  static struct tuple *tu;
+  
+  tu =iovec_tuple("lastjid", sizeof("lastjid"),
+				 &jid, sizeof(jid));
+  return jail_get(tuple_to_iovec(tu), 2, 0);
 }
 
 
@@ -79,8 +81,11 @@ get_first_jail(void) {
  */
 int
 get_next_jail(int jid) {
-  printf("%d\n", jid);
-  return -1;
+  static struct tuple *tu;
+  
+  tu = iovec_tuple("lastjid", sizeof("lastjid"),
+		   &jid, sizeof(jid));
+  return jail_get(tuple_to_iovec(tu), 2, 0);
 }
 
 
@@ -94,8 +99,14 @@ get_next_jail(int jid) {
  */
 int
 get_jid(char *name){
-  printf("%s\n", name);
-  return -1;
+  static struct tuple tu[2];
+  static int jid = 0;
+  
+  tu[0] = *iovec_tuple("name", sizeof("name"),
+		       name, sizeof(name));
+  tu[1] = *iovec_tuple("jid", sizeof("jid"),
+		       &jid, sizeof(jid));
+  return jid;
 }
 
 
@@ -109,23 +120,47 @@ get_jid(char *name){
  */
 char *
 get_name(int jid){
-  printf("%d\n", jid);
-  return "";
+  static struct tuple tu[2];
+  static char name[MAXHOSTNAMELEN];
+  
+  tu[0] = *iovec_tuple("jid", sizeof("jid"),
+		       &jid, sizeof(jid));
+  tu[1] = *iovec_tuple("name", sizeof("name"),
+		       name, sizeof(name));
+  return name;
 }
 
 
 /** \brief return a list of all running jail as jid
  *
- * @param
- * @return
+ * @param jids is a list of integer
+ * @param len is the size of the list
+ * @return numbers of items set in the list
  * @see
  * @todo
  */
 int
-get_all_jid(int *list, size_t len){
-  printf("%p\n", &list);
-  printf("%zu\n", len);
-  return -1;
+get_all_jid(int *jids, size_t len){
+  int jid = 0;
+  int c = 0;
+  for(c=0; (jid=get_next_jail(jid))!=-1; c++)
+    if (c == (int)len)
+      return c;
+    else
+      jids[c] = jid;
+  return c;
+}
+
+
+/** \brief return the sum of all running jails
+ *
+ */
+int
+get_running_jails(void) {
+  static int jid = 0;
+  static int c = 0;
+  for(c=0; (jid=get_next_jail(jid))!=-1; c++);
+  return c;
 }
 
 

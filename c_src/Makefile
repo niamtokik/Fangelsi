@@ -6,13 +6,20 @@
 ERLANG_PATH ?= /usr/local/lib/erlang
 
 CC ?= cc
-CC_INCLUDES += -I/usr/local/include
+CC_ERLANG = -fpic -shared
 CC_INCLUDES += -I$(ERLANG_PATH)/usr/include
+CC_INCLUDES += -I/usr/local/include
+
 CC_LIBRARIES = -ljail
+
 CC_WARNINGS = -Wall -Wextra -Werror 
 CC_WARNINGS += -Wformat -Wformat-security -Werror=format-security
-CC_ERLANG = -fpic -shared
+
+CC_SECURITY += -D_FORTIFY_SOURCE=2 
+CC_SECURITY += -fstack-protector
+
 CC_OPTS = $(CC_WARNINGS) $(CC_ERLANG) $(CC_LIBRARIES) $(CC_INCLUDES)
+CC_OPTS += $(CC_SECURITY)
 
 
 .ifdef DESTDIR
