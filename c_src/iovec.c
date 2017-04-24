@@ -45,7 +45,9 @@ iovec_tuple(void *key, size_t key_len
  */
 struct tuple *
 iovec_tuples(struct tuple *tu1, struct tuple *tu2) {
-
+  (void)tu1;
+  (void)tu2;
+  return tu1;
 }
 
 

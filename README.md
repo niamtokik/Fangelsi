@@ -43,6 +43,8 @@ using only freebsd jail syscall. Two version will be available:
  
  * ATF (https://github.com/jmmv/atf)
  
+ * Kyua (https://github.com/jmmv/kyua)
+ 
  * Valgrind (http://valgrind.org/)
  
  * Capsicum (https://www.cl.cam.ac.uk/research/security/capsicum/freebsd.html)

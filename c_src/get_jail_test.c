@@ -2,26 +2,23 @@
  * 
  */
 
+#include <stdio.h>
 #include <atf-c.h>
 #include "jail.h"
+#include "iovec.h"
 
 /* helper function */
-ATF_TC(_lastjid);
-ATF_TC_HEAD(_lastjid, tc){}
-ATF_TC_BODY(_lastjid, tc){}
+ATF_TC(lastjid);
 
-ATF_TC(_name);
-ATF_TC(_jid);
-ATF_TC(_parameter);
+ATF_TC_HEAD(lastjid, tc){
+  atf_tc_set_md_var(tc, "descr", "_lastjid test");
+}
 
-/* main get function */
-ATF_TC(get_first_jail);
-ATF_TC(get_next_jail);
-ATF_TC(get_name);
-ATF_TC(get_jid);
-ATF_TC(get_all_jid);
-ATF_TC(get_running_jails);
-ATF_TC(get_parameter_with_jid);
-ATF_TC(get_parameter_with_name);
-ATF_TC(get_parameters_with_jid);
-ATF_TC(get_parameters_with_name);
+ATF_TC_BODY(lastjid, tc){
+  ATF_CHECK_EQ(0, 0+0);
+}
+
+ATF_TP_ADD_TCS(tp){
+  ATF_TP_ADD_TC(tp, lastjid);
+  return atf_no_error();
+}
