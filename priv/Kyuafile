@@ -1,0 +1,3 @@
+syntax(2);
+test_suite('<%TEST_NAME%>');
+atf_test_program({name='<%TEST_PROGRAM%>'});
