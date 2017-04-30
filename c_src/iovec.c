@@ -39,7 +39,6 @@ iovec_tuple(void *key, size_t key_len
   iovec_push(&tu.value, value, value_len);
   return &tu;
 }
-
 /* \brief
  *
  */
