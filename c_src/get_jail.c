@@ -46,6 +46,8 @@
 #include <jail.h>
 #include <sys/jail.h>
 #include "jail.h"
+#include <sys/types.h>
+#include <sys/sysctl.h>
 
 /** \brief return jid of first started jail from kernel
  *
@@ -290,4 +292,53 @@ _parameter(char *param, size_t param_len){
   printf("%s\n", param);
   printf("%zu\n", param_len);
   return t;
+}
+
+/** return number of jails available
+ * 
+ */
+int
+get_param_list(void) {
+  return 0;
+}
+
+/** \brief explicitely return limits from sysctl mibs
+ *  you can list all param with:
+ *    sysctl security.jail.param
+ */
+
+/* security.jail.param.host.hostuuid */
+size_t
+get_limit_hostuuid(void) {
+  return 0;
+}
+
+/* security.jail.param.host.domainname */
+size_t
+get_limit_domainname(void) {
+  return 0;
+}
+
+/* security.jail.param.host.hostname */
+size_t
+get_limit_hostname(void) {
+  return 0;
+}
+
+/* security.jail.param.osrelease */
+size_t
+get_limit_osrelease(void) {
+  return 0;
+}
+
+/* security.jail.param.path */
+size_t
+get_limit_path(void) {
+  return 0;
+}
+
+/* security.jail.param.name */
+size_t
+get_limit_name(void) {
+  return 0;
 }
