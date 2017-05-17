@@ -1,4 +1,4 @@
-# FreeBSD Internals
+# FreeBSD Internal
 
 Here some answers to lot of questions I have about FreeBSD internals
 
